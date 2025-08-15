@@ -344,6 +344,7 @@ const Scramble = {
 
 /* ====== Timer ====== */
 let running=false, startTs=0, holdArmed=false, inspectionLeft=0, mode=null;
+let clickCooldown = false; // empêche un double clic immédiat
 let currentDNF=false, currentPlus2=false, currentScramble='';
 
 function newScramble(){
@@ -513,9 +514,18 @@ function bindEvents(){
 
   newScrambleBtn.onclick=newScramble;
   startStopBtn.onclick=toggleTimer;
-  tapZone.addEventListener('click', (e)=>{ // tap milieu écran
-    if (!e.target.closest('button') && !e.target.closest('input') && !e.target.closest('textarea') && !e.target.closest('select')) toggleTimer();
-  });
+  tapZone.addEventListener('click', (e) => {
+  if (clickCooldown) return; // si le verrou est actif → on ignore le clic
+
+  // on lance/arrête le timer seulement si ce n'est pas un bouton ou un champ
+  if (!e.target.closest('button') && !e.target.closest('input') && !e.target.closest('textarea') && !e.target.closest('select')) {
+    toggleTimer(); // start ou stop selon l'état
+
+    // on active le verrou pendant 400 ms
+    clickCooldown = true;
+    setTimeout(() => { clickCooldown = false; }, 400);
+  }
+});
   document.addEventListener('keydown', e=>{ if(e.code==='Space' && !e.repeat){ e.preventDefault(); toggleTimer(); } });
 
   dnfBtn.onclick=()=>markFlag('dnf');
