@@ -51,6 +51,8 @@
   .bar > b{ display:block; height:100%; background:var(--accent); width:0%; }
   .row-between{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:16px; background:#0f172a; border:1px solid #27324a; padding:10px 14px; border-radius:10px; display:none; }
+  #tab-timer { cursor: pointer; }
+#tab-timer button, #tab-timer input, #tab-timer textarea, #tab-timer select { cursor: auto; }
 </style>
 </head>
 <body class="theme-cyan">
@@ -499,8 +501,10 @@ function download(filename, text){
   }
 }
 
-/* ====== Bindings ====== */
+let eventsBound = false;/* ====== Bindings ====== */
 function bindEvents(){
+  if (eventsBound) return; // empêche de rebinder deux fois
+  eventsBound = true;
   themeSelect.onchange=()=>{ state.theme=themeSelect.value; document.body.className=state.theme; saveState(); };
   puzzleSelect.onchange=()=>{ state.puzzle=puzzleSelect.value; saveState(); newScramble(); refreshStats(); };
   addProfileBtn.onclick=()=>{ const name=prompt('Nom du profil ?'); if(!name) return; const id='p'+Math.random().toString(36).slice(2,8);
@@ -564,7 +568,7 @@ function bindEvents(){
 }
 
 /* ====== Start ====== */
-init(); bindEvents(); renderAlgs(); renderHistory();
+init(); renderAlgs(); renderHistory();   // ❌ pas de 2ᵉ bindEvents()
 </script>
 </body>
 </html>
