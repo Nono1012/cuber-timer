@@ -344,6 +344,8 @@ const Scramble = {
 
 /* ====== Timer ====== */
 let running=false, startTs=0, holdArmed=false, inspectionLeft=0, mode=null;
+let clickCooldown = false;     // petit verrou après un stop
+let lastToggleAt = 0;          // anti-double clic global
 let clickCooldown = false; // empêche un double clic immédiat
 let currentDNF=false, currentPlus2=false, currentScramble='';
 
@@ -356,23 +358,58 @@ function newScramble(){
 }
 
 function toggleTimer(){
-  if(!running){
-    if(inspectionToggle.checked && inspectionLeft<=0){
-      inspectionLeft = (state.settings.inspSec||15)*1000;
-      tickInspection(); return;
+  const now = performance.now();
+
+  // anti-double tap global (start/stop rapprochés)
+  if (clickCooldown || (now - lastToggleAt) < 350) return;
+  lastToggleAt = now;
+
+  if (!running){
+    // au moindre tap qui arrive, on annule toute attente de "hold" précédente
+    holdArmed = false;
+
+    // Inspection : si activée et pas encore lancée, on lance l'inspection
+    if (inspectionToggle.checked && inspectionLeft <= 0){
+      inspectionLeft = (state.settings.inspSec || 15) * 1000;
+      tickInspection();
+      return;
     }
-    if(state.settings.hold){ holdArmed=true; timerDisplay.textContent='—'; setTimeout(()=>{ if(holdArmed) doStart(); },500); }
-    else doStart();
-  }else doStop();
+
+    // Si inspection est affichée et l'utilisateur retape → on démarre direct
+    if (inspectionLeft > 0){
+      inspectionLeft = 0;
+      timerDisplay.textContent = '00.00';
+      doStart();
+      return;
+    }
+
+    // Hold optionnel
+    if (state.settings.hold){
+      holdArmed = true;
+      timerDisplay.textContent = '—';
+      setTimeout(()=>{ if (holdArmed) doStart(); }, 500);
+    } else {
+      doStart();
+    }
+  } else {
+    // STOP
+    doStop();
+
+    // petit verrou pour éviter que le même tap relance un start
+    clickCooldown = true;
+    setTimeout(()=>{ clickCooldown = false; }, 350);
+  }
 }
 function doStart(){ running=true; holdArmed=false; currentDNF=false; currentPlus2=false; startTs=performance.now(); loop(); }
 function doStop(){
-  running=false;
-  const t=(performance.now()-startTs)/1000;
-  const final = currentDNF? 'DNF' : (currentPlus2? t+2 : t);
+  holdArmed = false; // <— important : annule toute attente de démarrage différé
+  running = false;
+  const t = (performance.now() - startTs) / 1000;
+  const final = currentDNF ? 'DNF' : (currentPlus2 ? (t+2) : t);
   timerDisplay.textContent = formatTime(final);
-  if(state.settings.autosave && !currentDNF) saveSolve();
-  awardPoints(t); refreshStats();
+  if (state.settings.autosave && !currentDNF) saveSolve();
+  awardPoints(t);
+  refreshStats();
 }
 function loop(){ if(!running) return; const t=(performance.now()-startTs)/1000; timerDisplay.textContent=formatTime(t); requestAnimationFrame(loop); }
 function tickInspection(){
@@ -515,15 +552,9 @@ function bindEvents(){
   newScrambleBtn.onclick=newScramble;
   startStopBtn.onclick=toggleTimer;
   tapZone.addEventListener('click', (e) => {
-  if (clickCooldown) return; // si le verrou est actif → on ignore le clic
-
-  // on lance/arrête le timer seulement si ce n'est pas un bouton ou un champ
-  if (!e.target.closest('button') && !e.target.closest('input') && !e.target.closest('textarea') && !e.target.closest('select')) {
-    toggleTimer(); // start ou stop selon l'état
-
-    // on active le verrou pendant 400 ms
-    clickCooldown = true;
-    setTimeout(() => { clickCooldown = false; }, 400);
+  if (!e.target.closest('button') && !e.target.closest('input') &&
+      !e.target.closest('textarea') && !e.target.closest('select')) {
+    toggleTimer();
   }
 });
   document.addEventListener('keydown', e=>{ if(e.code==='Space' && !e.repeat){ e.preventDefault(); toggleTimer(); } });
